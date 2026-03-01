@@ -12,22 +12,34 @@
     "prepare": "expo-module prepare",
     "prepublishOnly": "expo-module prepublishOnly",
     "expo-module": "expo-module",
-    "open:ios": "xed example/ios",
-    "open:android": "open -a \"Android Studio\" example/android"
+    "open:ios": "xed example/ios"
   },
   "keywords": [
     "react-native",
     "expo",
-    "react-native-icloud-kit",
-    "ReactNativeIcloudKit"
+    "icloud",
+    "cloudkit",
+    "key-value-store",
+    "backup",
+    "ios"
   ],
-  "repository": "https://github.com/BogdanGeorgian91/react-native-icloud-kit",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BogdanGeorgian91/react-native-icloud-kit.git"
+  },
   "bugs": {
     "url": "https://github.com/BogdanGeorgian91/react-native-icloud-kit/issues"
   },
   "author": "Bogdan Georgian Alexa <bogdan.georgian370@gmail.com> (https://github.com/BogdanGeorgian91)",
   "license": "MIT",
   "homepage": "https://github.com/BogdanGeorgian91/react-native-icloud-kit#readme",
+  "files": [
+    "build/",
+    "ios/",
+    "src/",
+    "plugin/",
+    "expo-module.config.json"
+  ],
   "dependencies": {},
   "devDependencies": {
     "@types/react": "~19.1.1",
@@ -36,8 +48,7 @@
     "react-native": "0.82.1"
   },
   "peerDependencies": {
-    "expo": "*",
-    "react": "*",
-    "react-native": "*"
+    "expo": ">=51.0.0",
+    "react-native": ">=0.74.0"
   }
 }
