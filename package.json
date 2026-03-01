@@ -1,0 +1,43 @@
+{
+  "name": "react-native-icloud-kit",
+  "version": "0.1.0",
+  "description": "CloudKit and NSUbiquitousKeyValueStore for React Native. Save/query/batch CKRecords, key-value sync, and iCloud entitlements via Expo config plugin. iOS only. Built with Expo Modules API.",
+  "main": "build/index.js",
+  "types": "build/index.d.ts",
+  "scripts": {
+    "build": "expo-module build",
+    "clean": "expo-module clean",
+    "lint": "expo-module lint",
+    "test": "expo-module test",
+    "prepare": "expo-module prepare",
+    "prepublishOnly": "expo-module prepublishOnly",
+    "expo-module": "expo-module",
+    "open:ios": "xed example/ios",
+    "open:android": "open -a \"Android Studio\" example/android"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "react-native-icloud-kit",
+    "ReactNativeIcloudKit"
+  ],
+  "repository": "https://github.com/BogdanGeorgian91/react-native-icloud-kit",
+  "bugs": {
+    "url": "https://github.com/BogdanGeorgian91/react-native-icloud-kit/issues"
+  },
+  "author": "Bogdan Georgian Alexa <bogdan.georgian370@gmail.com> (https://github.com/BogdanGeorgian91)",
+  "license": "MIT",
+  "homepage": "https://github.com/BogdanGeorgian91/react-native-icloud-kit#readme",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/react": "~19.1.1",
+    "expo-module-scripts": "^55.0.2",
+    "expo": "^55.0.3",
+    "react-native": "0.82.1"
+  },
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*",
+    "react-native": "*"
+  }
+}

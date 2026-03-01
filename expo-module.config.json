@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android", "web"],
+  "apple": {
+    "modules": ["ReactNativeIcloudKitModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.icloudkit.ReactNativeIcloudKitModule"]
+  }
+}

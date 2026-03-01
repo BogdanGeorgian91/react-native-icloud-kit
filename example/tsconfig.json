@@ -1,0 +1,10 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "react-native-icloud-kit": ["../src/index"],
+      "react-native-icloud-kit/*": ["../src/*"]
+    }
+  }
+}
