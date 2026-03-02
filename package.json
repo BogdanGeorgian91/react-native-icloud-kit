@@ -1,6 +1,6 @@
 {
   "name": "react-native-icloud-kit",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "CloudKit and NSUbiquitousKeyValueStore for React Native. Save/query/batch CKRecords, key-value sync, and iCloud entitlements via Expo config plugin. iOS only. Built with Expo Modules API.",
   "main": "build/index.js",
   "types": "build/index.d.ts",
