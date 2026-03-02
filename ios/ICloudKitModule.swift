@@ -77,13 +77,16 @@ public class ICloudKitModule: Module {
             savePolicy: .allKeys, atomically: false
           )
 
-          // Check result for the single record
+          // Check result for the single record.
+          // IMPORTANT: throw the raw CKError here — withZoneRecovery
+          // needs the original error type to detect zoneNotFound.
+          // Error mapping happens in withZoneRecovery's catch.
           if let result = saveResults[ckRecordID] {
             switch result {
             case .success(let savedRecord):
               return savedRecord.recordID.recordName
             case .failure(let error):
-              throw self.mapCKError(error)
+              throw error
             }
           }
 
@@ -192,7 +195,7 @@ public class ICloudKitModule: Module {
             case .success:
               return true
             case .failure(let error):
-              throw self.mapCKError(error)
+              throw error
             }
           }
 
@@ -262,6 +265,9 @@ public class ICloudKitModule: Module {
   /// CloudKit development environment was reset from the Dashboard, deleting
   /// the zone server-side while the local UserDefaults flag remained `true`),
   /// this helper resets the flag, re-creates the zone, and retries once.
+  ///
+  /// All non-recoverable errors are mapped via `mapCKError` before re-throwing
+  /// so callers in the body can throw raw CKErrors for proper zone detection.
   private func withZoneRecovery<T>(db: CKDatabase, _ body: () async throws -> T) async throws -> T {
     do {
       try await self.ensureZoneExists(db: db)
@@ -270,9 +276,13 @@ public class ICloudKitModule: Module {
       if self.isZoneNotFoundError(error) {
         UserDefaults.standard.removeObject(forKey: Self.zoneCreatedKey)
         try await self.ensureZoneExists(db: db)
-        return try await body()
+        do {
+          return try await body()
+        } catch {
+          throw self.mapCKError(error)
+        }
       }
-      throw error
+      throw self.mapCKError(error)
     }
   }
 
