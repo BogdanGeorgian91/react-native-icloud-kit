@@ -113,7 +113,7 @@ const available = await iCloud.isAvailable();
 
 ### `iCloud.getUserRecordID()`
 
-Get the current user's CloudKit record ID. Useful for diagnostics or identifying which iCloud account the data belongs to.
+Get the current user's CloudKit record ID. This is a **container-scoped** identifier — the same iCloud account gets a different record ID in each app's CloudKit container. Useful for diagnostics, user attribution, or generating a stable per-app identity token.
 
 ```typescript
 try {
