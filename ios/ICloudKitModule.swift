@@ -54,6 +54,13 @@ public class ICloudKitModule: Module {
       return status == .available
     }
 
+    // MARK: getUserRecordID
+
+    AsyncFunction("getUserRecordID") { () -> String in
+      let recordID = try await self.container.userRecordID()
+      return recordID.recordName
+    }
+
     // MARK: save
 
     AsyncFunction("save") { (recordType: String, fields: [String: Any?], recordId: String?) -> String in
@@ -267,10 +274,13 @@ public class ICloudKitModule: Module {
   /// Saves records in chunks with automatic `limitExceeded` retry.
   /// Starts with chunks of 400. If the server returns `limitExceeded`,
   /// halves the chunk size and retries.
+  /// Individual record failures are retried up to 2 times before being skipped.
   private func batchSaveChunked(_ records: [CKRecord], db: CKDatabase) async throws -> Int {
     var chunkSize = min(records.count, 400)
     var saved = 0
     var remaining = records
+    let maxRetries = 2
+    var retryCounts: [CKRecord.ID: Int] = [:]
 
     while !remaining.isEmpty {
       let chunk = Array(remaining.prefix(chunkSize))
@@ -288,11 +298,16 @@ public class ICloudKitModule: Module {
             saved += 1
           case .failure:
             if let failedRecord = chunk.first(where: { $0.recordID == id }) {
-              failures.append(failedRecord)
+              let count = (retryCounts[id] ?? 0) + 1
+              if count <= maxRetries {
+                retryCounts[id] = count
+                failures.append(failedRecord)
+              }
+              // else: skip this record — exceeded max retries
             }
           }
         }
-        // Advance past the chunk, then add back any individual failures
+        // Advance past the chunk, then add back any retryable failures
         remaining = Array(remaining.dropFirst(chunk.count)) + failures
       } catch let error as CKError where error.code == .limitExceeded {
         // Server rejected the batch size — halve and retry

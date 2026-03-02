@@ -24,6 +24,13 @@ export interface ICloudAPI {
   isAvailable(): Promise<boolean>;
 
   /**
+   * Fetch the current user's CloudKit record ID (recordName).
+   * Useful for support/debug: identifies which iCloud account owns the data.
+   * Throws if iCloud is not available.
+   */
+  getUserRecordID(): Promise<string>;
+
+  /**
    * Save a single CKRecord to CloudKit private database.
    * Creates a new record or overwrites an existing one if `recordId` matches.
    *
@@ -97,6 +104,11 @@ export const iCloud: ICloudAPI = {
   async isAvailable(): Promise<boolean> {
     if (!IS_IOS) return false;
     return NativeICloudKit!.isAvailable();
+  },
+
+  async getUserRecordID(): Promise<string> {
+    if (!IS_IOS) throw new Error('iCloud is only available on iOS');
+    return NativeICloudKit!.getUserRecordID();
   },
 
   async save(
