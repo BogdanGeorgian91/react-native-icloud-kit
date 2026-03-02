@@ -65,30 +65,30 @@ public class ICloudKitModule: Module {
 
     AsyncFunction("save") { (recordType: String, fields: [String: Any?], recordId: String?) -> String in
       try await self.withQoS { db in
-        try await self.ensureZoneExists(db: db)
+        try await self.withZoneRecovery(db: db) {
+          let recordName = recordId ?? UUID().uuidString
+          let ckRecordID = CKRecord.ID(recordName: recordName, zoneID: self.zone.zoneID)
+          let record = CKRecord(recordType: recordType, recordID: ckRecordID)
 
-        let recordName = recordId ?? UUID().uuidString
-        let ckRecordID = CKRecord.ID(recordName: recordName, zoneID: self.zone.zoneID)
-        let record = CKRecord(recordType: recordType, recordID: ckRecordID)
+          self.setFields(on: record, from: fields)
 
-        self.setFields(on: record, from: fields)
+          let (saveResults, _) = try await db.modifyRecords(
+            saving: [record], deleting: [],
+            savePolicy: .allKeys, atomically: false
+          )
 
-        let (saveResults, _) = try await db.modifyRecords(
-          saving: [record], deleting: [],
-          savePolicy: .allKeys, atomically: false
-        )
-
-        // Check result for the single record
-        if let result = saveResults[ckRecordID] {
-          switch result {
-          case .success(let savedRecord):
-            return savedRecord.recordID.recordName
-          case .failure(let error):
-            throw self.mapCKError(error)
+          // Check result for the single record
+          if let result = saveResults[ckRecordID] {
+            switch result {
+            case .success(let savedRecord):
+              return savedRecord.recordID.recordName
+            case .failure(let error):
+              throw self.mapCKError(error)
+            }
           }
-        }
 
-        return recordName
+          return recordName
+        }
       }
     }
 
@@ -96,59 +96,59 @@ public class ICloudKitModule: Module {
 
     AsyncFunction("query") { (recordType: String, predicate: String?, limit: Int?) -> [[String: Any?]] in
       try await self.withQoS { db in
-        try await self.ensureZoneExists(db: db)
-
-        let nsPredicate: NSPredicate
-        if let predicateStr = predicate, !predicateStr.isEmpty {
-          nsPredicate = NSPredicate(format: predicateStr)
-        } else {
-          nsPredicate = NSPredicate(value: true)
-        }
-
-        let query = CKQuery(recordType: recordType, predicate: nsPredicate)
-        let resultsLimit = limit ?? 0 // 0 = fetch all with pagination
-
-        var allRecords: [[String: Any?]] = []
-        var cursor: CKQueryOperation.Cursor? = nil
-
-        // First fetch
-        let pageLimit = resultsLimit > 0 ? min(resultsLimit, 200) : 200
-        let (matchResults, queryCursor) = try await db.records(
-          matching: query,
-          inZoneWith: self.zone.zoneID,
-          resultsLimit: pageLimit
-        )
-
-        for (_, result) in matchResults {
-          if case .success(let record) = result {
-            allRecords.append(self.recordToDict(record))
-          }
-        }
-        cursor = queryCursor
-
-        // Paginate if needed
-        while let activeCursor = cursor {
-          if resultsLimit > 0 && allRecords.count >= resultsLimit {
-            break
+        try await self.withZoneRecovery(db: db) {
+          let nsPredicate: NSPredicate
+          if let predicateStr = predicate, !predicateStr.isEmpty {
+            nsPredicate = NSPredicate(format: predicateStr)
+          } else {
+            nsPredicate = NSPredicate(value: true)
           }
 
-          let remaining = resultsLimit > 0 ? resultsLimit - allRecords.count : 200
-          let nextLimit = min(remaining, 200)
+          let query = CKQuery(recordType: recordType, predicate: nsPredicate)
+          let resultsLimit = limit ?? 0 // 0 = fetch all with pagination
 
-          let (nextResults, nextCursor) = try await db.records(
-            continuingMatchFrom: activeCursor,
-            resultsLimit: nextLimit
+          var allRecords: [[String: Any?]] = []
+          var cursor: CKQueryOperation.Cursor? = nil
+
+          // First fetch
+          let pageLimit = resultsLimit > 0 ? min(resultsLimit, 200) : 200
+          let (matchResults, queryCursor) = try await db.records(
+            matching: query,
+            inZoneWith: self.zone.zoneID,
+            resultsLimit: pageLimit
           )
 
-          for (_, result) in nextResults {
+          for (_, result) in matchResults {
             if case .success(let record) = result {
               allRecords.append(self.recordToDict(record))
             }
           }
-          cursor = nextCursor
-        }
+          cursor = queryCursor
 
-        return allRecords
+          // Paginate if needed
+          while let activeCursor = cursor {
+            if resultsLimit > 0 && allRecords.count >= resultsLimit {
+              break
+            }
+
+            let remaining = resultsLimit > 0 ? resultsLimit - allRecords.count : 200
+            let nextLimit = min(remaining, 200)
+
+            let (nextResults, nextCursor) = try await db.records(
+              continuingMatchFrom: activeCursor,
+              resultsLimit: nextLimit
+            )
+
+            for (_, result) in nextResults {
+              if case .success(let record) = result {
+                allRecords.append(self.recordToDict(record))
+              }
+            }
+            cursor = nextCursor
+          }
+
+          return allRecords
+        }
       }
     }
 
@@ -156,22 +156,22 @@ public class ICloudKitModule: Module {
 
     AsyncFunction("batchSave") { (recordType: String, records: [[String: Any?]]) -> Int in
       try await self.withQoS { db in
-        try await self.ensureZoneExists(db: db)
+        try await self.withZoneRecovery(db: db) {
+          // Build CKRecords
+          var ckRecords: [CKRecord] = []
+          for recordDict in records {
+            let fields = recordDict["fields"] as? [String: Any?] ?? [:]
+            let recordId = recordDict["recordId"] as? String ?? UUID().uuidString
 
-        // Build CKRecords
-        var ckRecords: [CKRecord] = []
-        for recordDict in records {
-          let fields = recordDict["fields"] as? [String: Any?] ?? [:]
-          let recordId = recordDict["recordId"] as? String ?? UUID().uuidString
+            let ckRecordID = CKRecord.ID(recordName: recordId, zoneID: self.zone.zoneID)
+            let record = CKRecord(recordType: recordType, recordID: ckRecordID)
+            self.setFields(on: record, from: fields)
+            ckRecords.append(record)
+          }
 
-          let ckRecordID = CKRecord.ID(recordName: recordId, zoneID: self.zone.zoneID)
-          let record = CKRecord(recordType: recordType, recordID: ckRecordID)
-          self.setFields(on: record, from: fields)
-          ckRecords.append(record)
+          // Save in chunks with limitExceeded retry
+          return try await self.batchSaveChunked(ckRecords, db: db)
         }
-
-        // Save in chunks with limitExceeded retry
-        return try await self.batchSaveChunked(ckRecords, db: db)
       }
     }
 
@@ -179,25 +179,25 @@ public class ICloudKitModule: Module {
 
     AsyncFunction("delete") { (recordType: String, recordId: String) -> Bool in
       try await self.withQoS { db in
-        try await self.ensureZoneExists(db: db)
+        try await self.withZoneRecovery(db: db) {
+          let ckRecordID = CKRecord.ID(recordName: recordId, zoneID: self.zone.zoneID)
 
-        let ckRecordID = CKRecord.ID(recordName: recordId, zoneID: self.zone.zoneID)
+          let (_, deleteResults) = try await db.modifyRecords(
+            saving: [], deleting: [ckRecordID],
+            savePolicy: .allKeys, atomically: false
+          )
 
-        let (_, deleteResults) = try await db.modifyRecords(
-          saving: [], deleting: [ckRecordID],
-          savePolicy: .allKeys, atomically: false
-        )
-
-        if let result = deleteResults[ckRecordID] {
-          switch result {
-          case .success:
-            return true
-          case .failure(let error):
-            throw self.mapCKError(error)
+          if let result = deleteResults[ckRecordID] {
+            switch result {
+            case .success:
+              return true
+            case .failure(let error):
+              throw self.mapCKError(error)
+            }
           }
-        }
 
-        return true
+          return true
+        }
       }
     }
 
@@ -205,13 +205,20 @@ public class ICloudKitModule: Module {
 
     AsyncFunction("deleteAll") { () -> Bool in
       try await self.withQoS { db in
-        // Deleting the custom zone deletes ALL records within it.
-        // This is the most efficient way to wipe all CloudKit data —
-        // a single server round-trip regardless of record count.
-        _ = try await db.modifyRecordZones(
-          saving: [],
-          deleting: [self.zone.zoneID]
-        )
+        do {
+          // Deleting the custom zone deletes ALL records within it.
+          // This is the most efficient way to wipe all CloudKit data —
+          // a single server round-trip regardless of record count.
+          _ = try await db.modifyRecordZones(
+            saving: [],
+            deleting: [self.zone.zoneID]
+          )
+        } catch {
+          // If the zone doesn't exist, that's fine — the data is already gone
+          if !self.isZoneNotFoundError(error) {
+            throw error
+          }
+        }
 
         // Reset the zone-created flag so it gets recreated on next use
         UserDefaults.standard.removeObject(forKey: Self.zoneCreatedKey)
@@ -246,6 +253,43 @@ public class ICloudKitModule: Module {
 
     _ = try await db.modifyRecordZones(saving: [zone], deleting: [])
     UserDefaults.standard.set(true, forKey: Self.zoneCreatedKey)
+  }
+
+  /// Wraps a CloudKit operation with automatic zone recovery.
+  ///
+  /// On the first attempt: calls `ensureZoneExists` (may use cached flag) then
+  /// executes `body`. If the operation fails with `zoneNotFound` (e.g. the
+  /// CloudKit development environment was reset from the Dashboard, deleting
+  /// the zone server-side while the local UserDefaults flag remained `true`),
+  /// this helper resets the flag, re-creates the zone, and retries once.
+  private func withZoneRecovery<T>(db: CKDatabase, _ body: () async throws -> T) async throws -> T {
+    do {
+      try await self.ensureZoneExists(db: db)
+      return try await body()
+    } catch {
+      if self.isZoneNotFoundError(error) {
+        UserDefaults.standard.removeObject(forKey: Self.zoneCreatedKey)
+        try await self.ensureZoneExists(db: db)
+        return try await body()
+      }
+      throw error
+    }
+  }
+
+  /// Checks whether an error (or any of its nested partial-failure errors)
+  /// indicates that the custom record zone does not exist.
+  private func isZoneNotFoundError(_ error: any Error) -> Bool {
+    guard let ckError = error as? CKError else { return false }
+    if ckError.code == .zoneNotFound { return true }
+    if ckError.code == .partialFailure,
+       let partialErrors = ckError.partialErrorsByItemID {
+      for (_, itemError) in partialErrors {
+        if let itemCKError = itemError as? CKError, itemCKError.code == .zoneNotFound {
+          return true
+        }
+      }
+    }
+    return false
   }
 
   /// Sets CKRecord fields from a JS dictionary.
@@ -332,6 +376,9 @@ public class ICloudKitModule: Module {
         // Server rejected the batch size — halve and retry
         chunkSize = max(chunkSize / 2, 1)
         continue
+      } catch let error as CKError where self.isZoneNotFoundError(error) {
+        // Let withZoneRecovery handle zone recreation and retry
+        throw error
       } catch {
         throw self.mapCKError(error)
       }
