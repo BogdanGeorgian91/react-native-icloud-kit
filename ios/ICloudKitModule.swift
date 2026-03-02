@@ -200,6 +200,25 @@ public class ICloudKitModule: Module {
         return true
       }
     }
+
+    // MARK: deleteAll
+
+    AsyncFunction("deleteAll") { () -> Bool in
+      try await self.withQoS { db in
+        // Deleting the custom zone deletes ALL records within it.
+        // This is the most efficient way to wipe all CloudKit data —
+        // a single server round-trip regardless of record count.
+        _ = try await db.modifyRecordZones(
+          saving: [],
+          deleting: [self.zone.zoneID]
+        )
+
+        // Reset the zone-created flag so it gets recreated on next use
+        UserDefaults.standard.removeObject(forKey: Self.zoneCreatedKey)
+
+        return true
+      }
+    }
   }
 
   // MARK: - Private helpers

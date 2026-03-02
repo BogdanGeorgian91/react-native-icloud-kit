@@ -75,6 +75,17 @@ export interface ICloudAPI {
    * @returns `true` on success
    */
   delete(recordType: string, recordId: string): Promise<boolean>;
+
+  /**
+   * Delete ALL records from CloudKit private database by deleting the
+   * custom record zone. This is the most efficient way to wipe all data —
+   * a single server round-trip regardless of record count.
+   *
+   * The zone will be automatically recreated on the next save/query operation.
+   *
+   * @returns `true` on success
+   */
+  deleteAll(): Promise<boolean>;
 }
 
 export interface ICloudKVSAPI {
@@ -89,6 +100,11 @@ export interface ICloudKVSAPI {
    * Returns `null` if the key doesn't exist.
    */
   get(key: string): Promise<string | null>;
+
+  /**
+   * Remove a key from NSUbiquitousKeyValueStore.
+   */
+  remove(key: string): Promise<void>;
 }
 
 // ─── Native Module Loading ─────────────────────────────────────────
@@ -145,6 +161,11 @@ export const iCloud: ICloudAPI = {
     if (!IS_IOS) throw new Error('iCloud is only available on iOS');
     return NativeICloudKit!.delete(recordType, recordId);
   },
+
+  async deleteAll(): Promise<boolean> {
+    if (!IS_IOS) throw new Error('iCloud is only available on iOS');
+    return NativeICloudKit!.deleteAll();
+  },
 };
 
 export const iCloudKVS: ICloudKVSAPI = {
@@ -156,5 +177,10 @@ export const iCloudKVS: ICloudKVSAPI = {
   async get(key: string): Promise<string | null> {
     if (!IS_IOS) return null;
     return NativeICloudKVS!.get(key);
+  },
+
+  async remove(key: string): Promise<void> {
+    if (!IS_IOS) throw new Error('iCloud KVS is only available on iOS');
+    return NativeICloudKVS!.remove(key);
   },
 };

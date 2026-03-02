@@ -17,5 +17,10 @@ public class ICloudKVSModule: Module {
     AsyncFunction("get") { (key: String) -> String? in
       return self.kvs.string(forKey: key)
     }
+
+    AsyncFunction("remove") { (key: String) in
+      self.kvs.removeObject(forKey: key)
+      self.kvs.synchronize()
+    }
   }
 }

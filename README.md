@@ -231,6 +231,22 @@ await iCloud.delete('GameSession', 'session-123');
 
 ---
 
+### `iCloud.deleteAll()`
+
+Delete ALL records from the CloudKit private database by deleting the custom record zone. This is the most efficient way to wipe all data -- a single server round-trip regardless of record count. The zone is automatically recreated on the next `save`, `query`, or `batchSave` call.
+
+Returns `true` on success.
+
+```typescript
+await iCloud.deleteAll();
+// All records in the private database are now gone.
+// The zone will be recreated automatically on next use.
+```
+
+> **Warning:** This is irreversible. All records of all types within the zone are permanently deleted.
+
+---
+
 ### `iCloudKVS.set(key, value)`
 
 Write a string value to `NSUbiquitousKeyValueStore`. The value is automatically synced across all of the user's devices via iCloud.
@@ -269,6 +285,20 @@ if (value) {
   const config = JSON.parse(value);
   console.log('Theme:', config.theme);
 }
+```
+
+---
+
+### `iCloudKVS.remove(key)`
+
+Remove a key from `NSUbiquitousKeyValueStore`. The removal is synced across all of the user's devices.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `key` | `string` | The key to remove |
+
+```typescript
+await iCloudKVS.remove('app_config');
 ```
 
 ---
