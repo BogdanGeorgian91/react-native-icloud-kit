@@ -100,11 +100,19 @@ public class ICloudKitModule: Module {
     AsyncFunction("query") { (recordType: String, predicate: String?, limit: Int?) -> [[String: Any?]] in
       try await self.withQoS { db in
         try await self.withZoneRecovery(db: db) {
+          if predicate?.isEmpty != false {
+            return try await self.fetchAllRecords(
+              matching: recordType,
+              limit: limit,
+              db: db
+            )
+          }
+
           let nsPredicate: NSPredicate
           if let predicateStr = predicate, !predicateStr.isEmpty {
             nsPredicate = NSPredicate(format: predicateStr)
           } else {
-            nsPredicate = NSPredicate(value: true)
+            nsPredicate = NSPredicate(format: "TRUEPREDICATE")
           }
 
           let query = CKQuery(recordType: recordType, predicate: nsPredicate)
@@ -342,6 +350,53 @@ public class ICloudKitModule: Module {
       "recordId": record.recordID.recordName,
       "fields": fields,
     ]
+  }
+
+  /// Fetches all records in the custom zone without using CKQuery.
+  /// This avoids CloudKit query index requirements when callers simply need a
+  /// full restore of a record type from the private custom zone.
+  private func fetchAllRecords(matching recordType: String, limit: Int?, db: CKDatabase) async throws -> [[String: Any?]] {
+    var allRecords: [[String: Any?]] = []
+    var changeToken: CKServerChangeToken? = nil
+    let targetCount = limit ?? .max
+
+    repeat {
+      let batchLimit = min(targetCount - allRecords.count, 200)
+      if batchLimit <= 0 {
+        break
+      }
+
+      let (modificationResultsByID, _, nextChangeToken, moreComing) = try await db.recordZoneChanges(
+        inZoneWith: self.zone.zoneID,
+        since: changeToken,
+        desiredKeys: nil,
+        resultsLimit: batchLimit
+      )
+
+      for (_, result) in modificationResultsByID {
+        guard case .success(let modification) = result else {
+          continue
+        }
+
+        let record = modification.record
+        guard record.recordType == recordType else {
+          continue
+        }
+
+        allRecords.append(self.recordToDict(record))
+        if allRecords.count >= targetCount {
+          break
+        }
+      }
+
+      changeToken = nextChangeToken
+
+      if !moreComing || allRecords.count >= targetCount {
+        break
+      }
+    } while true
+
+    return allRecords
   }
 
   /// Saves records in chunks with automatic `limitExceeded` retry.
