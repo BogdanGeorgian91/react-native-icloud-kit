@@ -251,6 +251,11 @@ public class ICloudKitModule: Module {
             zoneID: self.zone.zoneID
           )
           let record = CKRecord(recordType: "ServerTimeProbe", recordID: ckRecordID)
+          // Set one field so the record type is NON-EMPTY. CloudKit refuses to
+          // promote a field-less record type from Development to Production
+          // ("Cannot promote schema with empty type"). The value is unused — we
+          // read the server-assigned `modificationDate` for the trusted time.
+          record["t"] = Int64(0) as CKRecordValue
 
           let (saveResults, _) = try await db.modifyRecords(
             saving: [record], deleting: [],
