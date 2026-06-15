@@ -237,6 +237,42 @@ public class ICloudKitModule: Module {
         return true
       }
     }
+
+    // MARK: getServerTimeMs
+
+    AsyncFunction("getServerTimeMs") { () -> Double in
+      try await self.withQoS { db in
+        try await self.withZoneRecovery(db: db) {
+          // Save a fixed-name sentinel record; CloudKit stamps modificationDate
+          // server-side, giving a device-clock-independent trusted time. The fixed
+          // recordName means it is overwritten each call and never accumulates.
+          let ckRecordID = CKRecord.ID(
+            recordName: "rn_icloudkit_servertime_probe",
+            zoneID: self.zone.zoneID
+          )
+          let record = CKRecord(recordType: "ServerTimeProbe", recordID: ckRecordID)
+
+          let (saveResults, _) = try await db.modifyRecords(
+            saving: [record], deleting: [],
+            savePolicy: .allKeys, atomically: false
+          )
+
+          if let result = saveResults[ckRecordID] {
+            switch result {
+            case .success(let savedRecord):
+              if let modDate = savedRecord.modificationDate {
+                return modDate.timeIntervalSince1970 * 1000.0
+              }
+              throw ICloudException("server time unavailable: no modificationDate")
+            case .failure(let error):
+              // Raw CKError so withZoneRecovery can detect zoneNotFound.
+              throw error
+            }
+          }
+          throw ICloudException("server time unavailable: no save result")
+        }
+      }
+    }
   }
 
   // MARK: - Private helpers

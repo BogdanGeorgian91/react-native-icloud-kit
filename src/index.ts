@@ -86,6 +86,16 @@ export interface ICloudAPI {
    * @returns `true` on success
    */
   deleteAll(): Promise<boolean>;
+
+  /**
+   * Returns the current CloudKit SERVER time in epoch milliseconds.
+   *
+   * Saves a tiny fixed-name sentinel record and reads back its server-assigned
+   * `CKRecord.modificationDate` — a value the device clock cannot forge. Use it
+   * to validate the device clock (e.g. to block "set the date forward" bypasses).
+   * iOS-only. Throws if iCloud is unavailable.
+   */
+  getServerTimeMs(): Promise<number>;
 }
 
 export interface ICloudKVSAPI {
@@ -165,6 +175,11 @@ export const iCloud: ICloudAPI = {
   async deleteAll(): Promise<boolean> {
     if (!IS_IOS) throw new Error('iCloud is only available on iOS');
     return NativeICloudKit!.deleteAll();
+  },
+
+  async getServerTimeMs(): Promise<number> {
+    if (!IS_IOS) throw new Error('iCloud is only available on iOS');
+    return NativeICloudKit!.getServerTimeMs();
   },
 };
 
