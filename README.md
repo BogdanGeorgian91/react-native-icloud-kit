@@ -2,7 +2,7 @@
 
 CloudKit and NSUbiquitousKeyValueStore for React Native. iOS only, built with Expo Modules API.
 
-- **CloudKit** (`iCloud`): Save, query, batch save, and delete records in the user's private CloudKit database. Automatic pagination, chunked batch uploads with retry, and typed error handling.
+- **CloudKit** (`iCloud`): Save, query, batch save, and delete records in the user's private CloudKit database. Automatic pagination, chunked batch uploads with retry, typed error handling, and a trusted **server-time** probe (`getServerTimeMs`).
 - **Key-Value Store** (`iCloudKVS`): Read and write small string values via `NSUbiquitousKeyValueStore` -- automatically synced across all of the user's devices.
 - **Expo Config Plugin**: Automatically configures iCloud entitlements, CloudKit services, and KVS identifiers at build time. No manual Xcode setup.
 
@@ -247,6 +247,31 @@ await iCloud.deleteAll();
 
 ---
 
+### `iCloud.getServerTimeMs()`
+
+Get the current CloudKit **server** time, in epoch milliseconds. Saves a tiny fixed-name sentinel record (`ServerTimeProbe`) and reads back its server-assigned `CKRecord.modificationDate` — a value the device clock **cannot forge**. Use it to validate the device clock (e.g. to block "set the date forward" bypasses of time-based limits).
+
+Returns a `number` (ms since epoch). Throws if iCloud is unavailable. iOS-only.
+
+```typescript
+try {
+  const serverNow = await iCloud.getServerTimeMs();
+  const skewMs = Math.abs(Date.now() - serverNow);
+  if (skewMs > 24 * 60 * 60 * 1000) {
+    // device clock is more than a day off the server — treat as untrusted
+  }
+} catch {
+  // iCloud unavailable — fall back to the device clock
+}
+```
+
+Notes:
+- The sentinel uses a **fixed** record name, so each call overwrites it (it never accumulates records).
+- Cost is one lightweight CloudKit write per call. Call it sparingly (e.g. once per session or per day-boundary check), not on a hot path.
+- The returned time is the CloudKit server's clock, independent of the device's date/time settings.
+
+---
+
 ### `iCloudKVS.set(key, value)`
 
 Write a string value to `NSUbiquitousKeyValueStore`. The value is automatically synced across all of the user's devices via iCloud.
@@ -330,6 +355,7 @@ try {
 - All CloudKit operations use the **private database** with a custom record zone (`RNICloudKitZone`). The zone is created automatically on the first operation and cached via `UserDefaults` to avoid redundant network calls.
 - Operations run with `.userInitiated` QoS (Apple's default for CloudKit is low priority).
 - The `save` function uses `savePolicy: .allKeys`, which means all fields are written on every save. This makes deterministic IDs safe for overwrites -- the entire record is replaced, not merged.
+- `getServerTimeMs` reuses the same `withQoS` + zone-recovery save path and reads the server-stamped `CKRecord.modificationDate`; it writes a single fixed-name `ServerTimeProbe` record in the custom zone.
 - Queries paginate in batches of 200 (CloudKit's recommended page size) using cursor-based pagination.
 - Android: `iCloud.isAvailable()` returns `false`, `iCloudKVS.get()` returns `null`. All other methods throw with "iCloud is only available on iOS".
 
