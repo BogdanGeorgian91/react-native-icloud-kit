@@ -1,5 +1,7 @@
 # react-native-icloud-kit
 
+> ☕ **If this library has helped you, consider [buying me a coffee](https://buymeacoffee.com/boogdan)!** Your support keeps development going.
+
 CloudKit and NSUbiquitousKeyValueStore for React Native. iOS only, built with Expo Modules API.
 
 - **CloudKit** (`iCloud`): Save, query, batch save, and delete records in the user's private CloudKit database. Automatic pagination, chunked batch uploads with retry, typed error handling, and a trusted **server-time** probe (`getServerTimeMs`).
