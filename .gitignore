@@ -42,3 +42,6 @@ yarn-error.log
 
 # Expo
 .expo/*
+
+claude-commands.log
+thoughts/*
