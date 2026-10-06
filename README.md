@@ -337,6 +337,7 @@ CloudKit errors are mapped to typed exceptions:
 | Error | Cause |
 |---|---|
 | `ICloudNotAvailableException` | User is not signed into iCloud |
+| `ICloudAccountTemporarilyUnavailableException` | Signed in, but the account is temporarily not ready for CloudKit (iOS 15+) — keep cached data, retry when the account becomes available |
 | `ICloudQuotaExceededException` | iCloud storage is full |
 | `ICloudNetworkException` | Network unavailable or connection failed |
 | `ICloudRecordNotFoundException` | Record ID does not exist |

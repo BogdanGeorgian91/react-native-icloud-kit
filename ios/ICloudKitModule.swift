@@ -7,6 +7,13 @@ class ICloudNotAvailableException: Exception {
   override var reason: String { "iCloud account is not available on this device" }
 }
 
+/// Signed in, but the account is not ready for CloudKit yet (e.g. right after a password change or
+/// while iCloud is still setting up). Apple: don't delete cached data or enqueue more operations;
+/// retry once `CKAccountChanged` reports the status `.available` again.
+class ICloudAccountTemporarilyUnavailableException: Exception {
+  override var reason: String { "iCloud account is temporarily unavailable" }
+}
+
 class ICloudQuotaExceededException: Exception {
   override var reason: String { "iCloud storage quota exceeded" }
 }
@@ -502,6 +509,8 @@ public class ICloudKitModule: Module {
     switch ckError.code {
     case .notAuthenticated:
       return ICloudNotAvailableException()
+    case .accountTemporarilyUnavailable:
+      return ICloudAccountTemporarilyUnavailableException()
     case .quotaExceeded:
       return ICloudQuotaExceededException()
     case .networkUnavailable, .networkFailure:
